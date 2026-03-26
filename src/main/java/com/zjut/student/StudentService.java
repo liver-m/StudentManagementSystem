@@ -113,20 +113,72 @@ public class StudentService {
     }
 
     public List<Student> searchStudents(String name, Integer ageMin, Integer ageMax) {
-        List<Student> allstus = getAllStudents();           // 先拿到所有学生（你已经会）
+        List<Student> allstus = getAllStudents();           // 先拿到所有学生
         List<Student> result = new ArrayList<>();       // 新建结果列表
 
         for (Student s : allstus) {                         // 遍历每个学生
-            // 这里写你的两个boolean判断（下面我分步问你）
+            // 两个boolean判断
             boolean nameMatch = (name == null || name.isEmpty() || s.getName().contains(name));                   // 你来填姓名模糊
             boolean ageMatch  = (ageMin==null || s.getAge()>=ageMin)&&
-                    (ageMax==null||s.getAge()<=ageMax);                   // 你来填年龄范围
+                    (ageMax==null||s.getAge()<=ageMax);
             if (nameMatch && ageMatch) {
                 result.add(s);
             }
         }
         return result;                                  // 返回过滤后的列表
     }
+
+
+    public PageResult<Student> searchStudentsWithPage(
+            String name, Integer ageMin, Integer ageMax,String classroom,
+            int currentPage, int pageSize) {
+        StringBuilder sql = new StringBuilder("select * from tb_student where 1=1");
+        List<Student> params = new ArrayList<>();
+
+        if(name != null && !name.trim().isEmpty()){
+            sql.append("and name = %?%");
+        }
+
+        if(ageMin != null){
+            sql.append("and age >= ?");
+        }
+
+        if(ageMax != null){
+            sql.append("and age <= ?");
+        }
+
+        if(classroom != null && !classroom.trim().isEmpty()){
+            sql.append("and classroom = %?%");
+        }
+
+        try(Connection coon = DBUtil.getConnection();
+        PreparedStatement pstmt = coon.prepareStatement(String.valueOf(sql))){
+            pstmt.setString(1,name);
+            pstmt.setInt(2,ageMin);
+            pstmt.setInt(3,ageMax);
+            pstmt.setString(4,classroom);
+
+            try(ResultSet rs = pstmt.executeQuery()){
+                if(rs.next()){
+                    int id = rs.getInt("id");
+                    int age = rs.getInt("age");
+                    String name1 = rs.getString("name");
+                    String classroom1 = rs.getString("classroom");
+
+                    Student stu1 = new Student(id,age,name1,classroom1);
+                    params.add(stu1);
+                }
+            }
+
+            int total = params.size();
+            List<Student> list= new ArrayList<>(params.subList(currentPage,pageSize));
+            return new PageResult<>(total, params, currentPage, pageSize);
+        }catch(SQLException e){
+            throw new RuntimeException(e);
+        }
+
+    }
+
     //删除学生
     public void deleteStudent(int id){
         String sql = "delete from tb_student where id = ?";
